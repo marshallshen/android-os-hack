@@ -1,0 +1,2 @@
+Which registers are modified by the should_fail call? Why do we only restore registers r0 - r3? How about r4 - r11? Check the ARM Software Development Toolkit Reference Guide to understand the caller and callee saved registers in ARM.
+- Call r0-r3 to store values, call r15 for program counter. r0-r3 are call-saved values. r4-r11 are callee-specific data. Because should_fail only cares about how many times "caller" triggered certain calls, we only store data from r0-r3.
