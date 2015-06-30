@@ -1,0 +1,9 @@
+Exercise 7. Call the system call and check results.
+- We check the results by successfully compilation on Linux and Android tablet.
+
+Exercise 8. Read hw2.c. What will happen if we print the return of each system call using printf right after each system call? Why?
+- the falut inject won't run as expected. When we call printf, the code triggers another system call, which will return 1 because the system call made by `printf` is successful.
+Therefore, even if previous system call failed, the success of 'printf' system call will override it.
+
+Exercise 9. Read inject.h. If you did not add the system call as the last system call, what may happen?
+- syscall(_NR_inject_failture) will fail to handle
