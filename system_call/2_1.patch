@@ -1,0 +1,13 @@
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index ff6bb0f..f0162c1 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -281,6 +281,8 @@ static inline void select_nohz_load_balancer(int stop_tick) { }
+ static inline void set_cpu_sd_state_idle(void) { }
+ #endif
+ 
++extern int num_of_sys_calls(void);
++
+ /*
+  * Only dump TASK_* tasks. (0 for all tasks)
+  */

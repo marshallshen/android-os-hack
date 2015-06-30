@@ -1,0 +1,115 @@
+diff --git a/arch/arm/kernel/calls.S b/arch/arm/kernel/calls.S
+index 463ff4a..52c17db 100644
+--- a/arch/arm/kernel/calls.S
++++ b/arch/arm/kernel/calls.S
+@@ -387,6 +387,7 @@
+ /* 375 */	CALL(sys_setns)
+ 		CALL(sys_process_vm_readv)
+ 		CALL(sys_process_vm_writev)
++/* 378 */ CALL(sys_fail)
+ #ifndef syscalls_counted
+ .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
+ #define syscalls_counted
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 54ee265..e9ac5a4 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -455,6 +455,48 @@ ENTRY(vector_swi)
+ 	tst	r10, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
+ 	bne	__sys_trace
+ 
++  /**
++   * START
++   * Hack Android OS - Implement System Calls
++   * Check if the new sys call should be triggered
++   * before comparing sys call no
++   */
++
++should_fail:
++  /**
++  * We only restore registers r0-r3 because
++  * they store arguments - they are caller-saved registers
++  */
++ENDPROC(should_fail)
++
++fail_syscall:
++  mov r1, sp
++  mov r0, #1        @ trace exit [IP =1]
++  bl  syscall_trace
++ENDPROC(fail_syscall)
++
++no_failure:
++ENDPROC(no_failure)
++
++  bl     should_fail
++  /* back up the return value into r10 */
++  mov    r10, r0
++  /* restore caller-saved registers */
++  add    r0, sp, #S_R0 + S_OFF
++  ldmia  r0, {r0 - r3}
++  /* check the return value stored in r10 */
++  cmp    r10, #0
++  beq    no_failure
++  /* fail the system call */
++  adr    lr, BSYM(ret_fast_syscall) @return address
++  ldr    pc, =fail_syscall
++  /**
++   * END
++   * Hack Android OS - Implement System Calls
++   * Check if the new sys call should be triggered
++   * before comparing sys call no
++   */
++
+ 	cmp	scno, #NR_syscalls		@ check upper syscall limit
+ 	adr	lr, BSYM(ret_fast_syscall)	@ return address
+ 	ldrcc	pc, [tbl, scno, lsl #2]		@ call sys_* routine
+@@ -632,6 +674,9 @@ sys_oabi_ftruncate64:
+ 		b	sys_ftruncate64
+ ENDPROC(sys_oabi_ftruncate64)
+ 
++sys_fail:
++ENDPROC(sys_fail)
++
+ sys_oabi_readahead:
+ 		str	r3, [sp]
+ 		mov	r3, r2
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index ff6bb0f..f0162c1 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -281,6 +281,8 @@ static inline void select_nohz_load_balancer(int stop_tick) { }
+ static inline void set_cpu_sd_state_idle(void) { }
+ #endif
+ 
++extern int num_of_sys_calls(void);
++
+ /*
+  * Only dump TASK_* tasks. (0 for all tasks)
+  */
+diff --git a/kernel/inject_fault.c b/kernel/inject_fault.c
+new file mode 100644
+index 0000000..d39c83a
+--- /dev/null
++++ b/kernel/inject_fault.c
+@@ -0,0 +1,21 @@
++/*
++ * Hack Android OS: implement System Calls
++ * Author: Marshall Shen
++ * Jun 28, 2015
++ */
++
++#include <linux/syscalls.h>
++
++SYSCALL_DEFINE1(fail, int n){
++  //NOTHING YET
++}
++
++long fail_syscall()
++{
++  return -1;
++}
++
++long should_fail()
++{
++  return -1;
++}

@@ -1,0 +1,56 @@
+diff --git a/arch/arm/kernel/calls.S b/arch/arm/kernel/calls.S
+index 463ff4a..52c17db 100644
+--- a/arch/arm/kernel/calls.S
++++ b/arch/arm/kernel/calls.S
+@@ -387,6 +387,7 @@
+ /* 375 */	CALL(sys_setns)
+ 		CALL(sys_process_vm_readv)
+ 		CALL(sys_process_vm_writev)
++/* 378 */ CALL(sys_fail)
+ #ifndef syscalls_counted
+ .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
+ #define syscalls_counted
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 54ee265..f5c61d5 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -632,6 +632,9 @@ sys_oabi_ftruncate64:
+ 		b	sys_ftruncate64
+ ENDPROC(sys_oabi_ftruncate64)
+ 
++sys_fail:
++ENDPROC(sys_fail)
++
+ sys_oabi_readahead:
+ 		str	r3, [sp]
+ 		mov	r3, r2
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index ff6bb0f..f0162c1 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -281,6 +281,8 @@ static inline void select_nohz_load_balancer(int stop_tick) { }
+ static inline void set_cpu_sd_state_idle(void) { }
+ #endif
+ 
++extern int num_of_sys_calls(void);
++
+ /*
+  * Only dump TASK_* tasks. (0 for all tasks)
+  */
+diff --git a/kernel/inject_fault.c b/kernel/inject_fault.c
+new file mode 100644
+index 0000000..45c75e4
+--- /dev/null
++++ b/kernel/inject_fault.c
+@@ -0,0 +1,11 @@
++/*
++ * Hack Android OS: implement System Calls
++ * Author: Marshall Shen
++ * Jun 28, 2015
++ */
++
++#include <linux/syscalls.h>
++
++SYSCALL_DEFINE1(fail, int n){
++  //NOTHING YET
++}
