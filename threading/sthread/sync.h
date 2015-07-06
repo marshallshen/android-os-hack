@@ -5,13 +5,23 @@
 #ifndef _STHREAD_SYNC_H_
 #define _STHREAD_SYNC_H_
 
+#include "sthread.h"
+
 /*
  * Semaphore structure
  */
-struct sthread_sem_struct {
-  /* FILL ME IN! */
+struct queue_struct {
+  sthread_t st;
+  struct queue_struct *next;
 };
 
+struct sthread_sem_struct {
+  int count;
+  unsigned long guard;
+  struct queue_struct *t;
+};
+
+typedef struct queue_struct queue_t;
 typedef struct sthread_sem_struct sthread_sem_t;
 
 int sthread_sem_init(sthread_sem_t *sem, int count);
