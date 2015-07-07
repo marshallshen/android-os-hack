@@ -1,11 +1,12 @@
-#include <stdio.h>
+`#include <stdio.h>
 #include <sys/utsname.h>
-#include "inject.h"
+#include <inject.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <pthread.h>
 #include <math.h>
+
 #define NUM_THREADS 2
 /*#define TOTAL_CALLS 20 */
     enum __netlock_t {
