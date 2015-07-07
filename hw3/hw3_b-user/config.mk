@@ -1,0 +1,3 @@
+LOCAL_MODULE    := hw3
+LOCAL_SRC_FILES := hw3.c
+
