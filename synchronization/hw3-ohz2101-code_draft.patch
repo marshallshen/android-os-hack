@@ -64,17 +64,17 @@ index ff6bb0f..a6797b0 100644
  	/* PI waiters blocked on a rt_mutex held by this task */
  	struct plist_head pi_waiters;
 diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
-index 3de3acb..1942eaa 100644
+index 3de3acb..7e60425 100644
 --- a/include/linux/syscalls.h
 +++ b/include/linux/syscalls.h
-@@ -76,6 +76,7 @@ struct file_handle;
- #include <linux/quota.h>
- #include <linux/key.h>
- #include <trace/syscall.h>
-+/*#include <linux/net_lock.h>*/
- 
- #define __SC_DECL1(t1, a1)	t1 a1
- #define __SC_DECL2(t2, a2, ...) t2 a2, __SC_DECL1(__VA_ARGS__)
+@@ -70,6 +70,7 @@ struct file_handle;
+ #include <linux/list.h>
+ #include <linux/bug.h>
+ #include <linux/sem.h>
++#include <linux/net_lock.h>
+ #include <asm/siginfo.h>
+ #include <asm/signal.h>
+ #include <linux/unistd.h>
 @@ -857,5 +858,7 @@ asmlinkage long sys_process_vm_writev(pid_t pid,
  				      const struct iovec __user *rvec,
  				      unsigned long riovcnt,
@@ -137,6 +137,18 @@ index 6096e80..ef8dece 100644
  	exit_mm(tsk);
  
  	if (group_dead)
+diff --git a/kernel/fork.c b/kernel/fork.c
+index 0de735c..7e2ae19 100644
+--- a/kernel/fork.c
++++ b/kernel/fork.c
+@@ -1222,6 +1222,7 @@ static struct task_struct *copy_process(unsigned long clone_flags,
+ 	INIT_LIST_HEAD(&p->sibling);
+ 	rcu_copy_process(p);
+ 	p->vfork_done = NULL;
++	p->alloc_net_lock = NET_LOCK_N;
+ 	spin_lock_init(&p->alloc_lock);
+ 
+ 	init_sigpending(&p->pending);
 diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
 index 5370bcb..165fc0d 100644
 --- a/kernel/sched/sched.h
