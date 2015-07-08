@@ -1,0 +1,151 @@
+diff --git a/arch/arm/include/asm/unistd.h b/arch/arm/include/asm/unistd.h
+index 512cd14..faa0e73 100644
+--- a/arch/arm/include/asm/unistd.h
++++ b/arch/arm/include/asm/unistd.h
+@@ -10,6 +10,7 @@
+  * Please forward _all_ changes to this file to rmk@arm.linux.org.uk,
+  * no matter what the change is.  Thanks!
+  */
++
+ #ifndef __ASM_ARM_UNISTD_H
+ #define __ASM_ARM_UNISTD_H
+ 
+@@ -404,6 +405,8 @@
+ #define __NR_setns			(__NR_SYSCALL_BASE+375)
+ #define __NR_process_vm_readv		(__NR_SYSCALL_BASE+376)
+ #define __NR_process_vm_writev		(__NR_SYSCALL_BASE+377)
++#define __NR_netlock_acquire		(__NR_SYSCALL_BASE+378)
++#define __NR_netlock_release		(__NR_SYSCALL_BASE+379)
+ 
+ /*
+  * The following SWIs are ARM private.
+diff --git a/arch/arm/kernel/calls.S b/arch/arm/kernel/calls.S
+index 463ff4a..6115e1b 100644
+--- a/arch/arm/kernel/calls.S
++++ b/arch/arm/kernel/calls.S
+@@ -358,7 +358,7 @@
+ 		CALL(sys_epoll_pwait)
+ 		CALL(sys_kexec_load)
+ 		CALL(sys_utimensat)
+-		CALL(sys_signalfd)
++		CALL(syzs_signalfd)
+ /* 350 */	CALL(sys_timerfd_create)
+ 		CALL(sys_eventfd)
+ 		CALL(sys_fallocate)
+@@ -387,6 +387,9 @@
+ /* 375 */	CALL(sys_setns)
+ 		CALL(sys_process_vm_readv)
+ 		CALL(sys_process_vm_writev)
++/* 378 */	CALL(netlock_acquire)
++/* 379 */	CALL(netlock_release)
++
+ #ifndef syscalls_counted
+ .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
+ #define syscalls_counted
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index ff6bb0f..a6797b0 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -248,6 +248,7 @@ extern char ___assert_task_state[1 - 2*!!(
+ #define TASK_COMM_LEN 16
+ 
+ #include <linux/spinlock.h>
++#include <linux/net_lock.h>
+ 
+ /*
+  * This serializes "schedule()" and also protects
+@@ -1464,6 +1465,8 @@ struct task_struct {
+ 	/* Protection of the PI data structures: */
+ 	raw_spinlock_t pi_lock;
+ 
++	netlock_t alloc_net_lock;
++
+ #ifdef CONFIG_RT_MUTEXES
+ 	/* PI waiters blocked on a rt_mutex held by this task */
+ 	struct plist_head pi_waiters;
+diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+index 3de3acb..1942eaa 100644
+--- a/include/linux/syscalls.h
++++ b/include/linux/syscalls.h
+@@ -76,6 +76,7 @@ struct file_handle;
+ #include <linux/quota.h>
+ #include <linux/key.h>
+ #include <trace/syscall.h>
++/*#include <linux/net_lock.h>*/
+ 
+ #define __SC_DECL1(t1, a1)	t1 a1
+ #define __SC_DECL2(t2, a2, ...) t2 a2, __SC_DECL1(__VA_ARGS__)
+@@ -857,5 +858,7 @@ asmlinkage long sys_process_vm_writev(pid_t pid,
+ 				      const struct iovec __user *rvec,
+ 				      unsigned long riovcnt,
+ 				      unsigned long flags);
++asmlinkage int netlock_acquire(netlock_t type);
++asmlinkage int netlock_release(void);
+ 
+ #endif
+diff --git a/include/linux/wakelock.h b/include/linux/wakelock.h
+index 5b2d0f3..f5eeac9 100644
+--- a/include/linux/wakelock.h
++++ b/include/linux/wakelock.h
+@@ -16,9 +16,6 @@
+ #ifndef _LINUX_WAKELOCK_H
+ #define _LINUX_WAKELOCK_H
+ 
+-#include <linux/list.h>
+-#include <linux/ktime.h>
+-
+ /* A wake_lock prevents the system from entering suspend or other low power
+  * states when active. If the type is set to WAKE_LOCK_SUSPEND, the wake_lock
+  * prevents a full system suspend. If the type is WAKE_LOCK_IDLE, low power
+diff --git a/kernel/Makefile b/kernel/Makefile
+index cb41b95..85630e7 100644
+--- a/kernel/Makefile
++++ b/kernel/Makefile
+@@ -10,7 +10,7 @@ obj-y     = fork.o exec_domain.o panic.o printk.o \
+ 	    kthread.o wait.o kfifo.o sys_ni.o posix-cpu-timers.o mutex.o \
+ 	    hrtimer.o rwsem.o nsproxy.o srcu.o semaphore.o \
+ 	    notifier.o ksysfs.o cred.o \
+-	    async.o range.o groups.o
++	    async.o range.o groups.o netlock.o
+ 
+ ifdef CONFIG_FUNCTION_TRACER
+ # Do not trace debug files and internal ftrace files
+diff --git a/kernel/exit.c b/kernel/exit.c
+index 6096e80..ef8dece 100644
+--- a/kernel/exit.c
++++ b/kernel/exit.c
+@@ -58,6 +58,7 @@
+ #include <asm/unistd.h>
+ #include <asm/pgtable.h>
+ #include <asm/mmu_context.h>
++#include <linux/netlock.h>
+ 
+ static void exit_mm(struct task_struct * tsk);
+ 
+@@ -980,7 +981,13 @@ void do_exit(long code)
+ 
+ 	tsk->exit_code = code;
+ 	taskstats_exit(tsk, group_dead);
+-
++	
++	/* to gracefully exit and release on exit() */
++	if((*tsk).alloc_net_lock) != NET_LOCK_N)
++	{
++		printk(KERN_INFO "exit and release")
++		netlock_release();
++	}
+ 	exit_mm(tsk);
+ 
+ 	if (group_dead)
+diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
+index 5370bcb..165fc0d 100644
+--- a/kernel/sched/sched.h
++++ b/kernel/sched/sched.h
+@@ -2,6 +2,7 @@
+ #include <linux/sched.h>
+ #include <linux/mutex.h>
+ #include <linux/spinlock.h>
++#include <linux/net_lock.h>
+ #include <linux/stop_machine.h>
+ 
+ #include "cpupri.h"
