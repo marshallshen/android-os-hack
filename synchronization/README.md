@@ -1,6 +1,8 @@
 
 Part B: Synchronization in the Linux kernel (35 pts)
 
+Added all components necessary to kernel to support net_lock. Currently a pointer or something somewhere is preventing proper compilation and debugging on device. 
+
 unistd.h -> Add netlock System Call Number
 calls.S to add the System Call Table (didn't use the sys_ prefix to fit the net_lock.c conventions)
 sched.h -> added netlock_t to the sched parameters 
@@ -8,10 +10,8 @@ syscalls.h -> added netlock to the system calls headers.
 Makefile -> build netlock macho
 exit.c -> release on exit
 fork.c -> modify fork to create a lock
-net_lock.c -> i dont know how I lost this on the .patch file.
-
-wakelock.h -> DIDNT MEAN TO CHANGE THIS FILE
-
+netlock.c -> Using "current" to stay in user space
+netlock.h -> Header for netlock.c
 
 
 When the battery life of a mobile device is below a certain critical level, we might want to restrict which processes can access the network. If non-critical applications (e.g. social network updates) can be blocked from accessing the network when power supply is limited, the mobile device can have a potentially longer operation span. This functionality can be achieved if every process that wishes to use the network needs to acquire a read lock, and a process that monitors the device battery life can obtain an exclusive lock if the battery life is below a critical level. When such a process acquires an exclusive lock, no other process can acquire a regular lock, which blocks subsequent process from accessing the network.
