@@ -20,18 +20,9 @@ index 512cd14..faa0e73 100644
  /*
   * The following SWIs are ARM private.
 diff --git a/arch/arm/kernel/calls.S b/arch/arm/kernel/calls.S
-index 463ff4a..6115e1b 100644
+index 463ff4a..e75453f 100644
 --- a/arch/arm/kernel/calls.S
 +++ b/arch/arm/kernel/calls.S
-@@ -358,7 +358,7 @@
- 		CALL(sys_epoll_pwait)
- 		CALL(sys_kexec_load)
- 		CALL(sys_utimensat)
--		CALL(sys_signalfd)
-+		CALL(syzs_signalfd)
- /* 350 */	CALL(sys_timerfd_create)
- 		CALL(sys_eventfd)
- 		CALL(sys_fallocate)
 @@ -387,6 +387,9 @@
  /* 375 */	CALL(sys_setns)
  		CALL(sys_process_vm_readv)
