@@ -3,6 +3,28 @@ Part B: Synchronization in the Linux kernel (35 pts)
 
 Added all components necessary to kernel to support net_lock. Currently a pointer or something somewhere is preventing proper compilation and debugging on device. 
 
+w4118@ubuntu:~/msm_HW3_B$ make
+CHK     include/linux/version.h
+CHK     include/generated/utsrelease.h
+UPD     include/generated/utsrelease.h
+HOSTCC  scripts/basic/fixdep
+make[1]: `include/generated/mach-types.h' is up to date.
+CC      kernel/bounds.s
+GEN     include/generated/bounds.h
+CC      arch/arm/kernel/asm-offsets.s
+In file included from include/linux/perf_event.h:580:0,
+from include/linux/ftrace_event.h:8,
+from include/trace/syscall.h:6,
+from include/linux/syscalls.h:79,
+from include/linux/netlock.h:10,
+from include/linux/sched.h:251,
+from arch/arm/kernel/asm-offsets.c:13:
+include/linux/cgroup.h:358:11: warning: 'struct eventfd_ctx' declared inside parameter list [enabled by default]
+error, forbidden warning: cgroup.h:358
+make[1]: *** [arch/arm/kernel/asm-offsets.s] Error 1
+make: *** [prepare0] Error 2
+
+
 unistd.h -> Add netlock System Call Number
 calls.S to add the System Call Table (didn't use the sys_ prefix to fit the net_lock.c conventions)
 sched.h -> added netlock_t to the sched parameters 
