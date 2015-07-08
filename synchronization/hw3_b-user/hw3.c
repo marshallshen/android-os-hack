@@ -6,16 +6,19 @@
 #include <string.h>
 #include <pthread.h>
 #include <math.h>
+#include <linux/netlock.h>
 
 #define NUM_THREADS 2
 /*#define TOTAL_CALLS 20 */
+
+/*
     enum __netlock_t {
-    NET_LOCK_N, /* Placeholder for no lock */
-    NET_LOCK_R, /* Indicates regular lock */
-    NET_LOCK_E, /* Indicates exclusive lock */
+    NET_LOCK_N, /* Placeholder for no lock
+    NET_LOCK_R, /* Indicates regular lock
+    NET_LOCK_E, /* Indicates exclusive lock
      } ;
      typedef enum __netlock_t netlock_t;
-
+*/
 
     /*
     struct thread_info {       Used as argument to thread_start()
