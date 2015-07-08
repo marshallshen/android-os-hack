@@ -33,6 +33,53 @@ index 463ff4a..e75453f 100644
  #ifndef syscalls_counted
  .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
  #define syscalls_counted
+diff --git a/include/linux/net_lock.h b/include/linux/net_lock.h
+new file mode 100644
+index 0000000..894fa1b
+--- /dev/null
++++ b/include/linux/net_lock.h
+@@ -0,0 +1,41 @@
++#ifndef __LINUX_NETLOCK_H
++#define __LINUX_NETLOCK_H
++
++#include <linux/list.h>
++#include <linux/ktime.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/rtc.h>
++/*#include <linux/suspend.h>*/	
++#include <linux/syscalls.h> /* sys_sync */
++/*
++ * Based off SpinLock and Wakelock
++ * include/linux/spinlock.h - generic spinlock/rwlock declarations
++ */
++
++
++/* Base Setup From wakelock.c and spinlock.c */
++	
++     /* Syscall 378. Acquire netlock. type indicates
++        whether a regular or exclusive lock is needed. Returns 0 on success 
++	and -1 on failure.  
++      */
++/* Defined in syscalls.h 
++     int netlock_acquire(netlock_t type);
++*/
++
++     /* Syscall 379. Release netlock. Return 0 on success and -1 on failure.  
++      */
++/* Defined in syscalls.h 
++     int netlock_release(void);
++*/
++
++     enum __netlock_t {
++        NET_LOCK_N, /* Placeholder for no lock */
++	NET_LOCK_R, /* Indicates regular lock */
++	NET_LOCK_E, /* Indicates exclusive lock */
++     } ;
++     typedef enum __netlock_t netlock_t;
++  		
++
++#endif
 diff --git a/include/linux/sched.h b/include/linux/sched.h
 index ff6bb0f..a6797b0 100644
 --- a/include/linux/sched.h
@@ -140,6 +187,54 @@ index 0de735c..7e2ae19 100644
  	spin_lock_init(&p->alloc_lock);
  
  	init_sigpending(&p->pending);
+diff --git a/kernel/net_lock.c b/kernel/net_lock.c
+new file mode 100644
+index 0000000..2955b68
+--- /dev/null
++++ b/kernel/net_lock.c
+@@ -0,0 +1,42 @@
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/rtc.h>
++#include <linux/suspend.h>
++#include <linux/syscalls.h> /* sys_sync */
++#include <linux/list.h>
++#include <linux/netlock.h>
++#include <linux/spinlock.h>
++#include <linux/sched.h>
++#include <linux/wait.h>
++
++/*
++     enum __netlock_t {
++     NET_LOCK_N,  Placeholder for no lock 
++     NET_LOCK_R,  Indicates regular lock 
++     NET_LOCK_E,  Indicates exclusive lock 
++     } ;
++     typedef enum __netlock_t netlock_t;
++*/
++
++/* Base Setup From wakelock.c and spinlock.c */
++
++     /* Syscall 378. Acquire netlock. type indicates
++        whether a regular or exclusive lock is needed. Returns 0 on success 
++	      and -1 on failure.  
++      */
++
++asmlinkage int netlock_acquire(netlock_t type)
++     {
++      
++      return 0;
++     }
++     /* Syscall 379. Release netlock. Return 0 on success and -1 on failure.  
++      */
++asmlinkage int netlock_release(void)
++     {
++
++      return 0;
++     }
++
++
++  		
 diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
 index 5370bcb..165fc0d 100644
 --- a/kernel/sched/sched.h
@@ -152,3 +247,18 @@ index 5370bcb..165fc0d 100644
  #include <linux/stop_machine.h>
  
  #include "cpupri.h"
+diff --git a/ramdisk.img b/ramdisk.img
+new file mode 100644
+index 0000000..44ab9c3
+Binary files /dev/null and b/ramdisk.img differ
+diff --git a/test_kernel.sh b/test_kernel.sh
+new file mode 100644
+index 0000000..9b51e7d
+--- /dev/null
++++ b/test_kernel.sh
+@@ -0,0 +1,5 @@
++#!/bin/sh
++
++adb reboot bootloader
++sleep 5
++sudo `which fastboot` -c "console=ttyHSL0,115200,n8 androidboot.hardware=flo user_debug=31 msm_rtb.filter=0x3F ehci-hcd.park=3" -b 0x80200000 -n 2048 -r 0x02000000 boot arch/arm/boot/zImage ramdisk.img
