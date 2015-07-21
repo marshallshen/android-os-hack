@@ -1,5 +1,5 @@
 diff --git a/include/linux/sched.h b/include/linux/sched.h
-index d7f9f90..2349fba 100644
+index ff6bb0f..c7e28ee 100644
 --- a/include/linux/sched.h
 +++ b/include/linux/sched.h
 @@ -39,6 +39,7 @@
@@ -11,7 +11,7 @@ index d7f9f90..2349fba 100644
  #define SCHED_RESET_ON_FORK     0x40000000
  
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index 5533ec2..eef93fa 100644
+index 1cee48f..32d57fb 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
 @@ -4062,7 +4062,10 @@ __setscheduler(struct rq *rq, struct task_struct *p, int policy, int prio)
@@ -37,10 +37,10 @@ index 5533ec2..eef93fa 100644
  
 diff --git a/kernel/sched/mycfs.c b/kernel/sched/mycfs.c
 new file mode 100644
-index 0000000..7f850cc
+index 0000000..3ea50c6
 --- /dev/null
 +++ b/kernel/sched/mycfs.c
-@@ -0,0 +1,384 @@
+@@ -0,0 +1,377 @@
 +/* mycfs_sched_class implementation */
 +
 +/* Notes:
@@ -212,7 +212,7 @@ index 0000000..7f850cc
 +	printk(KERN_INFO "enqueue_entity: before link\n");
 +	rb_link_node(&sme->run_node, parent, link);
 +	printk(KERN_INFO "enqueue_entity: before insert\n");
-+	printk(KERN_INFO "enqueue entity: printing parent pointer %p\nprinting the SME pointer: %p\nenqueue entity: printing the run_node pointer: %p\nenqueue entity: printing the tasks_timeline pointer: %p\n", parent, sme, &sme->run_node, &mycfs->tasks_timeline);
++	printk(KERN_INFO "enqueue entity: printing parent pointer %p\nprinting the SME pointer: %p\nenqueue entity: printing he run_node pointer: %p\nenqueue entity: printing the tasks_timeline pointer: %p\n", parent, sme, &sme->run_node, mycfs->tasks_timeline);
 +	rb_insert_color(&sme->run_node, &mycfs->tasks_timeline); // BREAKS HERE:
 +	printk(KERN_INFO "enqueue_entity: after insert node\n");
 +	printk(KERN_INFO "enqueue_entity: out of curr loop\n");
@@ -418,3 +418,15 @@ index 0000000..7f850cc
 +
 +	raw_spin_unlock_irqrestore(&rq->lock, flags);
 +}
+diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
+index 5370bcb..07df920 100644
+--- a/kernel/sched/sched.h
++++ b/kernel/sched/sched.h
+@@ -857,6 +857,7 @@ extern const struct sched_class stop_sched_class;
+ extern const struct sched_class rt_sched_class;
+ extern const struct sched_class fair_sched_class;
+ extern const struct sched_class idle_sched_class;
++extern const struct sched_class mycfs_sched_class;
+ 
+ 
+ #ifdef CONFIG_SMP
