@@ -37,7 +37,7 @@ index 1cee48f..32d57fb 100644
  
 diff --git a/kernel/sched/mycfs.c b/kernel/sched/mycfs.c
 new file mode 100644
-index 0000000..3ea50c6
+index 0000000..c2c7d22
 --- /dev/null
 +++ b/kernel/sched/mycfs.c
 @@ -0,0 +1,377 @@
@@ -212,7 +212,7 @@ index 0000000..3ea50c6
 +	printk(KERN_INFO "enqueue_entity: before link\n");
 +	rb_link_node(&sme->run_node, parent, link);
 +	printk(KERN_INFO "enqueue_entity: before insert\n");
-+	printk(KERN_INFO "enqueue entity: printing parent pointer %p\nprinting the SME pointer: %p\nenqueue entity: printing he run_node pointer: %p\nenqueue entity: printing the tasks_timeline pointer: %p\n", parent, sme, &sme->run_node, mycfs->tasks_timeline);
++	printk(KERN_INFO "enqueue entity: printing parent pointer %p\nprinting the SME pointer: %p\nenqueue entity: printing the run_node pointer: %p\nenqueue entity: printing the tasks_timeline pointer: %p\n", parent, sme, &sme->run_node, &mycfs->tasks_timeline);
 +	rb_insert_color(&sme->run_node, &mycfs->tasks_timeline); // BREAKS HERE:
 +	printk(KERN_INFO "enqueue_entity: after insert node\n");
 +	printk(KERN_INFO "enqueue_entity: out of curr loop\n");
