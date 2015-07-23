@@ -1,0 +1,82 @@
+commit 42b5a6b39a2ed73681cbd6e8d71ce9140cd7c1a7
+Author: Marshall Shen <mshen@Marshalls-MacBook-Air.local>
+Date:   Thu Jul 23 14:01:49 2015 -0500
+
+    Add setlimit sys call
+
+diff --git a/arch/arm/kernel/calls.S b/arch/arm/kernel/calls.S
+index 233f32b..ede5a6e 100644
+--- a/arch/arm/kernel/calls.S
++++ b/arch/arm/kernel/calls.S
+@@ -388,6 +388,8 @@
+ 		CALL(sys_process_vm_readv)
+ 		CALL(sys_process_vm_writev)
+ 		CALL(sys_set_mlimit)
++    CALL(sys_sched_setlimit)
++
+ #ifndef syscalls_counted
+ .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
+ #define syscalls_counted
+diff --git a/arch/arm/kernel/setlimit.c b/arch/arm/kernel/setlimit.c
+new file mode 100644
+index 0000000..872612a
+--- /dev/null
++++ b/arch/arm/kernel/setlimit.c
+@@ -0,0 +1,12 @@
++#include <linux/syscalls.h>
++#include <linux/sched.h>
++
++asmlinkage int sys_sched_setlimit(pid_t pid, int limit){
++
++	int i;
++	for(i = 0; i < 10; i++){
++		printk(KERN_INFO "sys_sched_setlimit: pid[%d] limit[%d]", (int) pid, limit);
++	}
++
++	return 0;
++}
+diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+index 4792e72..192adc6 100644
+--- a/include/linux/syscalls.h
++++ b/include/linux/syscalls.h
+@@ -858,5 +858,6 @@ asmlinkage long sys_process_vm_writev(pid_t pid,
+ 				      unsigned long riovcnt,
+ 				      unsigned long flags);
+ asmlinkage int sys_set_mlimit(uid_t uid, long mem_max);
++asmlinkage int sys_sched_setlimit(pid_t pid, int limit);
+ 
+ #endif
+diff --git a/kernel/sched/Makefile b/kernel/sched/Makefile
+index 3ede7d9..3d2c0b2 100644
+--- a/kernel/sched/Makefile
++++ b/kernel/sched/Makefile
+@@ -11,10 +11,8 @@ ifneq ($(CONFIG_SCHED_OMIT_FRAME_POINTER),y)
+ CFLAGS_core.o := $(PROFILING) -fno-omit-frame-pointer
+ endif
+ 
+-obj-y += core.o clock.o idle_task.o fair.o rt.o stop_task.o sched_avg.o
++obj-y += core.o clock.o idle_task.o fair.o rt.o stop_task.o sched_avg.o setlimit.o
+ obj-$(CONFIG_SMP) += cpupri.o
+ obj-$(CONFIG_SCHED_AUTOGROUP) += auto_group.o
+ obj-$(CONFIG_SCHEDSTATS) += stats.o
+ obj-$(CONFIG_SCHED_DEBUG) += debug.o
+-
+-
+diff --git a/kernel/sched/setlimit.c b/kernel/sched/setlimit.c
+new file mode 100644
+index 0000000..e47e295
+--- /dev/null
++++ b/kernel/sched/setlimit.c
+@@ -0,0 +1,12 @@
++#include <linux/syscalls.h>
++#include <linux/sched.h>
++
++asmlinkage int sys_sched_setlimit(pid_t pid, int limit){
++
++       int i;
++       for(i = 0; i < 10; i++){
++               printk(KERN_INFO "sys_sched_setlimit: pid[%d] limit[%d]", (int) pid, limit);
++       }
++
++       return 0;
++}
