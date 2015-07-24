@@ -11,22 +11,28 @@ index ff6bb0f..c7e28ee 100644
  #define SCHED_RESET_ON_FORK     0x40000000
  
 diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index 1cee48f..32d57fb 100644
+index 1cee48f..0c4f00c 100644
 --- a/kernel/sched/core.c
 +++ b/kernel/sched/core.c
-@@ -4062,7 +4062,10 @@ __setscheduler(struct rq *rq, struct task_struct *p, int policy, int prio)
+@@ -83,6 +83,7 @@
+ 
+ #include "sched.h"
+ #include "../workqueue_sched.h"
++#include <linux/sched.h>
+ 
+ #define CREATE_TRACE_POINTS
+ #include <trace/events/sched.h>
+@@ -4062,6 +4063,9 @@ __setscheduler(struct rq *rq, struct task_struct *p, int policy, int prio)
  	if (rt_prio(p->prio))
  		p->sched_class = &rt_sched_class;
  	else
--		p->sched_class = &fair_sched_class;
-+    if (p->policy == SCHED_MYCFS)
-+      p->sched_class = &mycfs_sched_class;
-+    else
-+      p->sched_class = &fair_sched_class;
++	if (p->policy == SCHED_MYCFS)
++		p->sched_class = &mycfs_sched_class;
++	else
+ 		p->sched_class = &fair_sched_class;
  	set_load_weight(p);
  }
- 
-@@ -4107,7 +4110,7 @@ recheck:
+@@ -4107,7 +4111,7 @@ recheck:
  
  		if (policy != SCHED_FIFO && policy != SCHED_RR &&
  				policy != SCHED_NORMAL && policy != SCHED_BATCH &&
@@ -419,14 +425,46 @@ index 0000000..c2c7d22
 +	raw_spin_unlock_irqrestore(&rq->lock, flags);
 +}
 diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
-index 5370bcb..07df920 100644
+index 5370bcb..8b2aadf 100644
 --- a/kernel/sched/sched.h
 +++ b/kernel/sched/sched.h
-@@ -857,6 +857,7 @@ extern const struct sched_class stop_sched_class;
+@@ -79,6 +79,7 @@ extern struct mutex sched_domains_mutex;
+ 
+ struct cfs_rq;
+ struct rt_rq;
++struct mycfs_rq; 
+ 
+ static LIST_HEAD(task_groups);
+ 
+@@ -371,6 +372,7 @@ struct rq {
+ 	u64 nr_switches;
+ 
+ 	struct cfs_rq cfs;
++	struct mycfs_rq mycfs;
+ 	struct rt_rq rt;
+ 
+ #ifdef CONFIG_FAIR_GROUP_SCHED
+@@ -856,6 +858,7 @@ enum cpuacct_stat_index {
+ extern const struct sched_class stop_sched_class;
  extern const struct sched_class rt_sched_class;
  extern const struct sched_class fair_sched_class;
- extern const struct sched_class idle_sched_class;
 +extern const struct sched_class mycfs_sched_class;
+ extern const struct sched_class idle_sched_class;
  
  
- #ifdef CONFIG_SMP
+@@ -880,6 +883,7 @@ extern int update_runtime(struct notifier_block *nfb, unsigned long action, void
+ extern void init_sched_rt_class(void);
+ extern void init_sched_fair_class(void);
+ 
++
+ extern void resched_task(struct task_struct *p);
+ extern void resched_cpu(int cpu);
+ 
+@@ -1155,6 +1159,7 @@ extern void print_rt_stats(struct seq_file *m, int cpu);
+ 
+ extern void init_cfs_rq(struct cfs_rq *cfs_rq);
+ extern void init_rt_rq(struct rt_rq *rt_rq, struct rq *rq);
++extern void init_mycfs_rq(struct mycfs_rq *mycfs);
+ extern void unthrottle_offline_cfs_rqs(struct rq *rq);
+ 
+ extern void account_cfs_bandwidth_used(int enabled, int was_enabled);
