@@ -1,0 +1,58 @@
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 22b0f1e..7bf67e9 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -17,7 +17,8 @@ CFLAGS_REMOVE_return_address.o = -pg
+ 
+ obj-y		:= elf.o entry-armv.o entry-common.o irq.o opcodes.o \
+ 		   process.o ptrace.o return_address.o sched_clock.o \
+-		   setup.o signal.o stacktrace.o sys_arm.o time.o traps.o
++		   setup.o signal.o stacktrace.o sys_arm.o time.o traps.o \
++		   set_mlimit.o
+ 
+ obj-$(CONFIG_DEPRECATED_PARAM_STRUCT) += compat.o
+ 
+diff --git a/arch/arm/kernel/calls.S b/arch/arm/kernel/calls.S
+index 463ff4a..f9c8d47 100644
+--- a/arch/arm/kernel/calls.S
++++ b/arch/arm/kernel/calls.S
+@@ -116,8 +116,6 @@
+ 		CALL(sys_setitimer)
+ /* 105 */	CALL(sys_getitimer)
+ 		CALL(sys_newstat)
+-		CALL(sys_newlstat)
+-		CALL(sys_newfstat)
+ 		CALL(sys_ni_syscall)		/* was sys_uname */
+ /* 110 */	CALL(sys_ni_syscall)		/* was sys_iopl */
+ 		CALL(sys_vhangup)
+@@ -387,6 +385,7 @@
+ /* 375 */	CALL(sys_setns)
+ 		CALL(sys_process_vm_readv)
+ 		CALL(sys_process_vm_writev)
++		CALL(sys_set_mlimit)
+ #ifndef syscalls_counted
+ .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
+ #define syscalls_counted
+diff --git a/arch/arm/kernel/set_mlimit.c b/arch/arm/kernel/set_mlimit.c
+new file mode 100644
+index 0000000..9365f36
+--- /dev/null
++++ b/arch/arm/kernel/set_mlimit.c
+@@ -0,0 +1,6 @@
++#include <linux/syscalls.h>
++
++asmlinkage int sys_set_mlimit(uid_t uid, long mem_max) {
++	// TODO
++	return 1;
++}
+diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+index 3de3acb..4792e72 100644
+--- a/include/linux/syscalls.h
++++ b/include/linux/syscalls.h
+@@ -857,5 +857,6 @@ asmlinkage long sys_process_vm_writev(pid_t pid,
+ 				      const struct iovec __user *rvec,
+ 				      unsigned long riovcnt,
+ 				      unsigned long flags);
++asmlinkage int sys_set_mlimit(uid_t uid, long mem_max);
+ 
+ #endif
