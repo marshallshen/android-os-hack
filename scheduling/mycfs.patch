@@ -1,0 +1,417 @@
+commit 6fa5ac6c7f761e5effa797c42fb447d3f0abf777
+Author: Marshall Shen <shen.marshall@gmail.com>
+Date:   Sun Aug 2 05:47:36 2015 -0700
+
+    WIP: mycfs 1
+
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index ff6bb0f..b0cd32e 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -42,6 +42,8 @@
+ /* Can be ORed in to make sure the process is reverted back to SCHED_NORMAL on fork */
+ #define SCHED_RESET_ON_FORK     0x40000000
+ 
++#define SCHED_MYCFS 6
++
+ #ifdef __KERNEL__
+ 
+ struct sched_param {
+@@ -1232,6 +1234,18 @@ struct sched_entity {
+ #endif
+ };
+ 
++struct sched_mycfs_entity {
++	struct rb_node     run_node;
++	struct list_head   group_node;
++	unsigned int       on_rq;
++	u64                exec_start;
++	u64                sum_exec_runtime;
++	u64                vruntime;
++	u64                prev_sum_exec_runtime;
++	u64                nr_migrations;
++	struct mycfs_rq    *mycfs;
++};
++
+ struct sched_rt_entity {
+ 	struct list_head run_list;
+ 	unsigned long timeout;
+@@ -1280,6 +1294,7 @@ struct task_struct {
+ 	unsigned int rt_priority;
+ 	const struct sched_class *sched_class;
+ 	struct sched_entity se;
++	struct sched_mycfs_entity sme;
+ 	struct sched_rt_entity rt;
+ 
+ #ifdef CONFIG_PREEMPT_NOTIFIERS
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 1cee48f..16e3daf 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -1731,6 +1731,14 @@ static void __sched_fork(struct task_struct *p)
+ 	p->se.vruntime			= 0;
+ 	INIT_LIST_HEAD(&p->se.group_node);
+ 
++	// initialize schedule_mycfs_entity
++	p->sme.on_rq = 0;
++	p->sme.vruntime = 0;
++	p->sme.exec_start = 0;
++	p->sme.sum_exec_runtime = 0;
++	p->sme.prev_sum_exec_runtime = 0;
++	p->sme.nr_migrations = 0;
++
+ #ifdef CONFIG_SCHEDSTATS
+ 	memset(&p->se.statistics, 0, sizeof(p->se.statistics));
+ #endif
+diff --git a/kernel/sched/mycfs.c b/kernel/sched/mycfs.c
+new file mode 100644
+index 0000000..02689c5
+--- /dev/null
++++ b/kernel/sched/mycfs.c
+@@ -0,0 +1,300 @@
++#include <linux/sched.h>
++#include "sched.h"
++
++void init_mycfs_rq(struct mycfs_rq *mycfs);
++static void enqueue_task_mycfs(struct rq *rq, struct task_struct *p, int flags);
++static void dequeue_task_mycfs(struct rq *rq, struct task_struct *p, int flags);
++static void enqueue_entity(struct mycfs_rq *mycfs, struct sched_mycfs_entity *se);
++static void dequeue_entity(struct mycfs_rq *mycfs, struct sched_mycfs_entity *se);
++static void yield_task_mycfs(struct rq *rq);
++static void check_preempt_curr_mycfs(struct rq *rq, struct task_struct *p, int wake_flags);
++static void set_next_entity(struct mycfs_rq *mycfs, struct sched_mycfs_entity *sme);
++static struct task_struct *pick_next_task_mycfs(struct rq *rq);
++static void put_prev_task_mycfs(struct rq *rq, struct task_struct *prev);
++static int select_task_rq_mycfs(struct task_struct *p, int sd_flag, int wake_flags);
++static void set_curr_task_mycfs(struct rq *rq);
++static void task_tick_mycfs(struct rq *rq, struct task_struct *curr, int queued);
++static void prio_changed_mycfs(struct rq *rq, struct task_struct *p, int oldprio);
++static void switched_to_mycfs(struct rq *rq, struct task_struct *p);
++static unsigned int get_rr_interval_mycfs(struct rq *rq, struct task_struct *task);
++static void task_fork_mycfs(struct task_struct *p);
++
++unsigned int sysctl_sched_latency_mycfs = 10000000ULL; // 10ms (in nanoseconds)
++
++void init_mycfs_rq(struct mycfs_rq *mycfs)
++{
++	printk(KERN_INFO "init_mycfs_rq");
++	mycfs->tasks_timeline = RB_ROOT;
++	mycfs->min_vruntime =(u64)(-(1LL << 20));
++}
++
++// see fair.c line 5538 for initialization of fair_sched_class
++const struct sched_class mycfs_sched_class;
++
++const struct sched_class mycfs_sched_class = {
++	.next = &idle_sched_class,
++	.enqueue_task = enqueue_task_mycfs,
++	.dequeue_task = dequeue_task_mycfs,
++	.yield_task = yield_task_mycfs,
++	.check_preempt_curr = check_preempt_curr_mycfs,
++	.pick_next_task = pick_next_task_mycfs,
++	.put_prev_task = put_prev_task_mycfs,
++	.select_task_rq = select_task_rq_mycfs, // select different rq based on processor
++	.set_curr_task = set_curr_task_mycfs,
++	.task_tick = task_tick_mycfs,
++	.prio_changed = prio_changed_mycfs,
++	.switched_to = switched_to_mycfs,
++	.get_rr_interval = get_rr_interval_mycfs,
++
++	 .task_fork = task_fork_mycfs
++};
++*/
++static void enqueue_task_mycfs(struct rq *rq, struct task_struct *p, int flags){
++	struct mycfs_rq *mycfs = &rq->mycfs;
++    struct sched_mycfs_entity *sme = &p->sme;	
++	printk(KERN_INFO "enqueue_task_mycfs: pid inserted:%d \n",p->pid);
++	if(!sme->on_rq && sme != mycfs->curr){
++			enqueue_entity(mycfs, sme);
++	}
++	
++	mycfs->nr_running++;
++	inc_nr_running(rq);
++	printk(KERN_INFO "enqueue_task_mycfs: end\n");
++}
++
++static void dequeue_task_mycfs(struct rq *rq, struct task_struct *p, int flags){
++
++	struct mycfs_rq *mycfs = &rq->mycfs;
++	struct sched_mycfs_entity *sme = &p->sme;
++
++	printk(KERN_INFO "dequeue_task_mycfs: start\n");
++
++	if(sme != mycfs->curr){
++		dequeue_entity(mycfs, sme);
++		//sme->on_rq = 0;
++	}
++	mycfs->nr_running--;
++	dec_nr_running(rq);
++	printk(KERN_INFO "dequeue_task_mycfs\n");
++
++}
++
++static inline int entity_before(struct sched_mycfs_entity *a, struct sched_mycfs_entity *b)
++{
++	return (s64)(a->vruntime - b->vruntime) < 0;
++}
++
++static void update_curr(struct mycfs_rq *mycfs) {
++	struct sched_mycfs_entity *curr = mycfs->curr;
++		u64 now = container_of(mycfs, struct rq, mycfs)->clock_task;
++	unsigned long delta_exec;
++
++
++	if(!curr){
++		printk("update_curr: not curr \n");
++		return;
++	}
++
++	printk("update_curr: now: %d\n ", (int)now);
++
++	//How long this process has been running for
++	delta_exec = (unsigned long)(now - curr->exec_start);
++	if (!delta_exec)
++		return;
++
++
++	//updating the vruntime
++	curr->sum_exec_runtime += delta_exec;
++	curr->vruntime += delta_exec;
++
++	curr->exec_start = now;
++
++	mycfs->runtime_remaining -= delta_exec;
++}
++
++static void enqueue_entity(struct mycfs_rq *mycfs, struct sched_mycfs_entity *sme)
++{
++	struct rb_node **link = &mycfs->tasks_timeline.rb_node;
++	struct rb_node *parent = NULL;
++	struct sched_mycfs_entity *entry;
++	int leftmost = 1;
++
++	update_curr(mycfs);
++
++	while(*link){
++		parent = *link;
++		entry = rb_entry(parent, struct sched_mycfs_entity, run_node);
++		if(entity_before(sme,entry)){
++			link = &parent->rb_left;
++		} else {
++			link = &parent->rb_right;
++			leftmost = 0;
++		}
++	}
++
++	if(leftmost)
++		mycfs->rb_leftmost = &sme->run_node;
++
++	printk(KERN_INFO "enqueue_entity: before link\n");
++	rb_link_node(&sme->run_node, parent, link);
++	printk(KERN_INFO "enqueue_entity: before insert\n");
++	printk(KERN_INFO "enqueue entity: printing parent pointer %p\nprinting the fucking SME pointer: %p\nenqueue entity: printing the fucking run_node pointer: %p\nenqueue entity: printing the fucking tasks_timeline pointer: %p\n", parent, sme, &sme->run_node, &mycfs->tasks_timeline);
++	rb_insert_color(&sme->run_node, &mycfs->tasks_timeline); // BREAKS HERE:
++	printk(KERN_INFO "enqueue_entity: after insert node\n");
++	
++	printk(KERN_INFO "enqueue_entity: out of curr loop\n");
++	sme->on_rq = 1;
++}
++
++
++static void dequeue_entity(struct mycfs_rq *mycfs, struct sched_mycfs_entity *sme)
++{
++	printk(KERN_INFO "dequeue_entity:");
++	update_curr(mycfs);
++	if (mycfs->rb_leftmost == &sme->run_node) {
++		struct rb_node *next_node;
++
++		next_node = rb_next(&sme->run_node);
++		mycfs->rb_leftmost = next_node;
++	}
++	printk(KERN_INFO "dequeue_entity: before erase\n");
++	rb_erase(&sme->run_node, &mycfs->tasks_timeline);
++	printk(KERN_INFO "dequeue_entity: after erase\n");
++	sme->on_rq = 0;
++}
++
++static void yield_task_mycfs(struct rq *rq){
++	struct mycfs_rq *mycfs = &rq->mycfs;
++	printk(KERN_INFO "yield_task_mycfs\n");
++	update_curr(mycfs);
++}
++static void check_preempt_curr_mycfs(struct rq *rq, struct task_struct *p, int wake_flags){
++	printk(KERN_INFO "check_preempt_curr\n");
++}
++static struct task_struct *pick_next_task_mycfs(struct rq *rq){
++	struct mycfs_rq *mycfs = &rq->mycfs;
++	struct sched_mycfs_entity *sme = NULL;
++	struct task_struct *p = NULL;
++	struct rb_node *left = mycfs->rb_leftmost;
++
++
++	if (!mycfs->nr_running)
++		return NULL;
++
++	if (!left){
++		printk("pick_next_task_mycfs: no left\n");
++		return NULL;
++	}
++
++	sme = rb_entry(left, struct sched_mycfs_entity, run_node);
++
++	printk(KERN_INFO "pick_next_task_mycfs: before container of\n");
++	set_next_entity(mycfs, sme);	
++	p = container_of(sme, struct task_struct, sme);
++	printk(KERN_INFO "pick_next_task_mycfs: after container of pid:%d\n", p->pid);
++	return p;
++}
++
++static void put_prev_task_mycfs(struct rq *rq, struct task_struct *prev){
++	struct sched_mycfs_entity *sme = &prev->sme;
++	struct mycfs_rq *mycfs = &rq->mycfs;
++	if((&(prev->sme))->on_rq){
++		update_curr(mycfs);
++	}
++	
++	if(1){ 
++		enqueue_entity(mycfs, sme);
++	}
++
++	printk(KERN_INFO "put_prev_task_mycfs: after loop put_prev\n");
++	mycfs->curr = NULL;
++}
++
++static int select_task_rq_mycfs(struct task_struct *p, int sd_flag, int wake_flags){
++	printk(KERN_INFO "select_task_rq_fair\n");
++	return task_cpu(p);
++}
++
++static void set_next_entity(struct mycfs_rq *mycfs, struct sched_mycfs_entity *sme)
++{
++	if(sme->on_rq){
++		dequeue_entity(mycfs, sme);
++	}
++	mycfs->curr = sme;
++}
++
++static void set_curr_task_mycfs(struct rq *rq){
++	struct sched_mycfs_entity *sme = &rq->curr->sme;
++	struct mycfs_rq *mycfs = &rq->mycfs;
++
++	set_next_entity(mycfs, sme);
++	printk(KERN_INFO "set_curr_task_mycfs\n");
++}
++
++static void task_tick_mycfs(struct rq *rq, struct task_struct *curr, int queued){	
++	struct mycfs_rq *mycfs;
++	struct sched_mycfs_entity *sme = &curr->sme;
++	struct rq *temprq;
++	struct task_struct *p;
++
++	printk(KERN_INFO "task_tick_mycfs\n");
++	
++	p = container_of(sme, struct task_struct, sme);
++	temprq = task_rq(p);
++
++	mycfs = &temprq->mycfs;
++
++	update_curr(mycfs);
++}
++
++
++static void prio_changed_mycfs(struct rq *rq, struct task_struct *p, int oldprio){
++	printk(KERN_INFO "prio_changed_mycfs\n");
++}
++
++static void switched_to_mycfs(struct rq *rq, struct task_struct *p){
++	printk(KERN_INFO "switched_to_mycfs\n");
++	if(!p->sme.on_rq)
++		return;
++	if (rq->curr == p)
++		resched_task(rq->curr);
++	p->sme.mycfs = &rq->mycfs;
++}
++
++static unsigned int get_rr_interval_mycfs(struct rq *rq, struct task_struct *task){
++
++	struct mycfs_rq *mycfs = &rq->mycfs;
++
++	printk(KERN_INFO "get_rr_interval_mycfs\n");
++	return sysctl_sched_latency_mycfs / mycfs->nr_running;
++}
++
++static void task_fork_mycfs(struct task_struct *p){
++	struct mycfs_rq *mycfs;
++	struct sched_mycfs_entity *sme = &p->sme, *curr;
++	int this_cpu = smp_processor_id();
++	struct rq *rq = this_rq();
++	unsigned long flags;
++
++
++	raw_spin_lock_irqsave(&rq->lock, flags);
++
++	update_rq_clock(rq);
++
++	if (unlikely(task_cpu(p) != this_cpu)) {
++		rcu_read_lock();
++		__set_task_cpu(p, this_cpu);
++		rcu_read_unlock();
++	}
++
++	mycfs = current->sme.mycfs;
++	curr = mycfs->curr;
++
++	update_curr(mycfs);
++
++	if (curr)
++		sme->vruntime = curr->vruntime;
++
++
++	raw_spin_unlock_irqrestore(&rq->lock, flags);
++}
+diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
+index 5370bcb..f5adf2f 100644
+--- a/kernel/sched/sched.h
++++ b/kernel/sched/sched.h
+@@ -273,6 +273,17 @@ struct cfs_rq {
+ #endif /* CONFIG_FAIR_GROUP_SCHED */
+ };
+ 
++struct mycfs_rq {
++   struct task_struct *waiting;
++   struct rq *rq;
++   unsigned long nr_running, h_nr_running;
++   u64 exec_block, min_vruntime, min_vruntime_copy;
++   s64 runtime_remaining;
++   struct rb_root tasks_timeline;
++   struct rb_node* rb_leftmost;
++   struct sched_mycfs_entity * curr,next,last,skip;
++};
++
+ static inline int rt_bandwidth_enabled(void)
+ {
+ 	return sysctl_sched_rt_runtime >= 0;
+@@ -371,6 +382,7 @@ struct rq {
+ 	u64 nr_switches;
+ 
+ 	struct cfs_rq cfs;
++	struct mycfs_rq mycfs;
+ 	struct rt_rq rt;
+ 
+ #ifdef CONFIG_FAIR_GROUP_SCHED
+@@ -856,6 +868,7 @@ enum cpuacct_stat_index {
+ extern const struct sched_class stop_sched_class;
+ extern const struct sched_class rt_sched_class;
+ extern const struct sched_class fair_sched_class;
++extern const struct sched_class mycfs_sched_class;
+ extern const struct sched_class idle_sched_class;
+ 
+ 
+@@ -1154,6 +1167,7 @@ extern void print_cfs_stats(struct seq_file *m, int cpu);
+ extern void print_rt_stats(struct seq_file *m, int cpu);
+ 
+ extern void init_cfs_rq(struct cfs_rq *cfs_rq);
++extern void init_mycfs_rq(struct mycfs_rq *mycfs_rq);
+ extern void init_rt_rq(struct rt_rq *rt_rq, struct rq *rq);
+ extern void unthrottle_offline_cfs_rqs(struct rq *rq);
+ 
