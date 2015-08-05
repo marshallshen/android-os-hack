@@ -35,14 +35,14 @@ index 463ff4a..f9c8d47 100644
  #define syscalls_counted
 diff --git a/arch/arm/kernel/set_mlimit.c b/arch/arm/kernel/set_mlimit.c
 new file mode 100644
-index 0000000..9365f36
+index 0000000..4210e25
 --- /dev/null
 +++ b/arch/arm/kernel/set_mlimit.c
 @@ -0,0 +1,6 @@
 +#include <linux/syscalls.h>
 +
 +asmlinkage int sys_set_mlimit(uid_t uid, long mem_max) {
-+	// TODO
++	printk("set maximum memory limit uid[%d] max memory[%ld]", (int) uid, mem_max);
 +	return 1;
 +}
 diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
