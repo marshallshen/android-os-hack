@@ -1,0 +1,58 @@
+diff --git a/arch/arm/kernel/calls.S b/arch/arm/kernel/calls.S
+index 463ff4a..54a41fb 100644
+--- a/arch/arm/kernel/calls.S
++++ b/arch/arm/kernel/calls.S
+@@ -387,6 +387,7 @@
+ /* 375 */	CALL(sys_setns)
+ 		CALL(sys_process_vm_readv)
+ 		CALL(sys_process_vm_writev)
++		CALL(sys_ext4_cowcopy)
+ #ifndef syscalls_counted
+ .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
+ #define syscalls_counted
+diff --git a/fs/Makefile b/fs/Makefile
+index 95cf9de6..d05cb95 100644
+--- a/fs/Makefile
++++ b/fs/Makefile
+@@ -11,7 +11,7 @@ obj-y :=	open.o read_write.o file_table.o super.o \
+ 		attr.o bad_inode.o file.o filesystems.o namespace.o \
+ 		seq_file.o xattr.o libfs.o fs-writeback.o \
+ 		pnode.o drop_caches.o splice.o sync.o utimes.o \
+-		stack.o fs_struct.o statfs.o
++		stack.o fs_struct.o statfs.o cowcopy.o
+ 
+ ifeq ($(CONFIG_BLOCK),y)
+ obj-y +=	buffer.o bio.o block_dev.o direct-io.o mpage.o ioprio.o
+diff --git a/fs/cowcopy.c b/fs/cowcopy.c
+new file mode 100644
+index 0000000..dc99998
+--- /dev/null
++++ b/fs/cowcopy.c
+@@ -0,0 +1,16 @@
++#include <linux/kernel.h>
++#include <linux/syscalls.h>
++#include <linux/export.h>
++#include <linux/sched.h>
++#include <linux/fs.h>
++#include <linux/path.h>
++#include <linux/slab.h>
++#include <linux/fs_struct.h>
++#include <linux/stat.h>
++#include <linux/printk.h>
++
++asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest)
++{
++	return 0;
++}
++
+diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+index 3de3acb..267ec01 100644
+--- a/include/linux/syscalls.h
++++ b/include/linux/syscalls.h
+@@ -857,5 +857,6 @@ asmlinkage long sys_process_vm_writev(pid_t pid,
+ 				      const struct iovec __user *rvec,
+ 				      unsigned long riovcnt,
+ 				      unsigned long flags);
++        asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest);
+ 
+ #endif
