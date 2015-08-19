@@ -1,3 +1,25 @@
+diff --git "a/\\" "b/\\"
+new file mode 100644
+index 0000000..dc99998
+--- /dev/null
++++ "b/\\"
+@@ -0,0 +1,16 @@
++#include <linux/kernel.h>
++#include <linux/syscalls.h>
++#include <linux/export.h>
++#include <linux/sched.h>
++#include <linux/fs.h>
++#include <linux/path.h>
++#include <linux/slab.h>
++#include <linux/fs_struct.h>
++#include <linux/stat.h>
++#include <linux/printk.h>
++
++asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest)
++{
++	return 0;
++}
++
 diff --git a/arch/arm/kernel/calls.S b/arch/arm/kernel/calls.S
 index 463ff4a..54a41fb 100644
 --- a/arch/arm/kernel/calls.S
@@ -25,10 +47,10 @@ index 95cf9de6..d05cb95 100644
  obj-y +=	buffer.o bio.o block_dev.o direct-io.o mpage.o ioprio.o
 diff --git a/fs/cowcopy.c b/fs/cowcopy.c
 new file mode 100644
-index 0000000..dc99998
+index 0000000..8311e9a
 --- /dev/null
 +++ b/fs/cowcopy.c
-@@ -0,0 +1,16 @@
+@@ -0,0 +1,62 @@
 +#include <linux/kernel.h>
 +#include <linux/syscalls.h>
 +#include <linux/export.h>
@@ -39,10 +61,56 @@ index 0000000..dc99998
 +#include <linux/fs_struct.h>
 +#include <linux/stat.h>
 +#include <linux/printk.h>
++#include <linux/mnt_namespace.h>
++#include <linux/mount.h>
++#include <linux/string.h>
++#include <linux/namei.h>
++#include <linux/path.h>
 +
 +asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest)
 +{
-+	return 0;
++/**
++*The system call should check following conditions: 
++*1) src must be a regular file and it cannot be a directory, otherwise return -EPERM. 
++*2) src must be a file in ext4 file system, otherwise return -EOPNOTSUPP. 
++*3) src and dest should be in the same device, otherwise return -EXDEV.
++*/
++int retval = 0;
++int returncode;
++struct path src_path;
++struct path dest_path;
++struct super_block *src_block;
++/*struct super_block *dest_block;*/
++struct dentry *src_dentry;
++
++/*0331     res = user_path_at(dfd, filename, lookup_flags, &path);*/
++/* open at PWD with AT_FDCWD*/
++
++returncode = user_path_at(AT_FDCWD, src, 0, &src_path);
++
++
++/*struct path mnt_path = { .dentry = mnt->mnt_root, .mnt = mnt }; */
++/*Condition 1 EPERM */
++
++src_dentry = src_path.dentry;
++src_block = src_path.mnt->mnt_sb;
++
++	if(!src_dentry->d_inode)
++	{
++		printk("\nENOENT src %p and dest %p",src,dest);
++		retval = -ENOENT;
++	}	
++	else if(strcmp(src_block->s_type->name, "ext4")) 
++	{
++		printk("\nEOPNOTSUPP src %p and dest %p",src,dest);
++		retval = -EOPNOTSUPP;
++	}	
++	else if(dest_path.mnt != src_path.mnt)
++	{
++		printk("\nEXDEV src %p and dest %p",src,dest);
++		retval = -EXDEV;
++	}
++	return retval;
 +}
 +
 diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
